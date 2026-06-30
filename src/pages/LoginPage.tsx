@@ -30,8 +30,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-glg-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-md p-6">
         <div className="text-center mb-6">
-          <h1 className="text-xl font-bold text-glg-700">Golden Ladder Group</h1>
-          <p className="text-sm text-gray-500 mt-1">Member Shares & Loans System</p>
+          <img src="/brand/logo.png" alt="Golden Ladder Group" className="w-28 h-28 mx-auto object-contain" />
+          <p className="text-sm text-gray-500 -mt-2">Member Shares & Loans System</p>
         </div>
 
         <div className="flex bg-gray-100 rounded-lg p-1 mb-6">

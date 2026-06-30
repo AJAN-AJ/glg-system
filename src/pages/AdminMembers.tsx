@@ -278,6 +278,7 @@ function MemberDetailModal({ member, adminId, onClose }: { member: Member; admin
         {member.monthlyShareTarget !== undefined && <p>Monthly Share Pledge: MK {member.monthlyShareTarget.toLocaleString()}</p>}
         {member.nextOfKinName && <p>Next of Kin: {member.nextOfKinName} ({member.nextOfKinPhone})</p>}
         <p>Registration Fee: {member.registrationFeeStatus}</p>
+        {member.agreedToConstitution && <p>Constitution Agreement: ✅ Agreed{member.signature ? ` — Signed: ${member.signature}` : ''}</p>}
       </div>
 
       {!confirmDelete ? (

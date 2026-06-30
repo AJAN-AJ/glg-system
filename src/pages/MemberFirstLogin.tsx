@@ -86,17 +86,27 @@ function ProfileStep({ memberId, onDone }: { memberId: string; onDone: () => Pro
   const [nextOfKinName, setNextOfKinName] = useState('')
   const [nextOfKinPhone, setNextOfKinPhone] = useState('')
   const [monthlyShareTarget, setMonthlyShareTarget] = useState('')
+  const [agreedToConstitution, setAgreedToConstitution] = useState(false)
+  const [signature, setSignature] = useState('')
+  const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError('')
+    if (!agreedToConstitution) {
+      setError('You must agree to the constitution, rules, and financial obligations of the Group to proceed.')
+      return
+    }
     setSubmitting(true)
     await db.members.update(memberId, {
       phoneNumber,
       email,
       nextOfKinName,
       nextOfKinPhone,
-      monthlyShareTarget: Number(monthlyShareTarget) || 0
+      monthlyShareTarget: Number(monthlyShareTarget) || 0,
+      agreedToConstitution,
+      signature
     })
     await onDone()
     setSubmitting(false)
@@ -110,16 +120,40 @@ function ProfileStep({ memberId, onDone }: { memberId: string; onDone: () => Pro
           An admin will review and approve your account before you can access your dashboard.
         </p>
       </div>
-      <Field label="Phone Number" value={phoneNumber} onChange={setPhoneNumber} />
+      <Field label="Phone Number (preferably WhatsApp)" value={phoneNumber} onChange={setPhoneNumber} />
       <Field label="Email (optional)" value={email} onChange={setEmail} required={false} />
-      <Field label="Next of Kin Name" value={nextOfKinName} onChange={setNextOfKinName} />
-      <Field label="Next of Kin Phone" value={nextOfKinPhone} onChange={setNextOfKinPhone} />
       <Field
-        label="Monthly Share Pledge (MK)"
+        label="My Monthly Share (MK)"
         value={monthlyShareTarget}
         onChange={setMonthlyShareTarget}
         type="number"
       />
+      <Field label="Next of Kin — Full Name" value={nextOfKinName} onChange={setNextOfKinName} />
+      <Field label="Next of Kin — Phone Number" value={nextOfKinPhone} onChange={setNextOfKinPhone} />
+
+      <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
+        I, the undersigned, hereby apply for membership in Golden Ladder Group. I agree to abide by the
+        constitution, rules, and financial obligations of the Group. I understand that this Group is built on
+        trust, discipline, and mutual responsibility.
+      </div>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          checked={agreedToConstitution}
+          onChange={(e) => setAgreedToConstitution(e.target.checked)}
+          className="w-4 h-4"
+        />
+        I Agree
+      </label>
+
+      <Field label="Signature (type your full name)" value={signature} onChange={setSignature} />
+
+      <p className="text-xs text-gray-500">
+        You will be required to pay a once-off registration fee of MK 3,000.00.
+      </p>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
       <button
         type="submit"
         disabled={submitting}

@@ -37,6 +37,8 @@ export interface Member {
   nextOfKinName?: string
   nextOfKinPhone?: string
   monthlyShareTarget?: number // MK they pledge to contribute per month
+  agreedToConstitution?: boolean
+  signature?: string // typed full name as signature, per the group's registration form
 
   registrationFeeStatus: 'unpaid' | 'paid' // flat MK 3000, goes to separate fund
   dateJoined: string // ISO date, set when account created

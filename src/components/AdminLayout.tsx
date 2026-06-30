@@ -20,11 +20,14 @@ export default function AdminLayout({ children, title }: { children: ReactNode; 
     <div className="min-h-screen bg-gray-50">
       <header className="bg-glg-700 text-white">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="font-semibold">Golden Ladder Group — Admin</h1>
-            {session?.type === 'admin' && (
-              <p className="text-xs text-glg-100/80">{session.account.fullName} ({session.account.role})</p>
-            )}
+          <div className="flex items-center gap-3">
+            <img src="/brand/logo.png" alt="GLG" className="w-9 h-9 rounded-md object-contain bg-white" />
+            <div>
+              <h1 className="font-semibold">Golden Ladder Group — Admin</h1>
+              {session?.type === 'admin' && (
+                <p className="text-xs text-glg-100/80">{session.account.fullName} ({session.account.role})</p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={logout} className="text-sm bg-glg-800 hover:bg-glg-700 px-3 py-1.5 rounded-md hidden sm:inline-block">

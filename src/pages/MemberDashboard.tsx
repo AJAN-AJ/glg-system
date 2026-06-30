@@ -31,9 +31,12 @@ export default function MemberDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-glg-700 text-white px-4 py-3 flex items-center justify-between">
-        <div>
-          <h1 className="font-semibold">Golden Ladder Group</h1>
-          <p className="text-xs text-glg-100/80">{member.firstName} {member.surname} · {member.memberId}</p>
+        <div className="flex items-center gap-3">
+          <img src="/brand/logo.png" alt="GLG" className="w-9 h-9 rounded-md object-contain bg-white" />
+          <div>
+            <h1 className="font-semibold">Golden Ladder Group</h1>
+            <p className="text-xs text-glg-100/80">{member.firstName} {member.surname} · {member.memberId}</p>
+          </div>
         </div>
         <button onClick={logout} className="text-sm bg-glg-800 hover:bg-glg-700 px-3 py-1.5 rounded-md">
           Log out

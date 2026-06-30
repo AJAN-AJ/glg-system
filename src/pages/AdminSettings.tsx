@@ -13,13 +13,14 @@ export default function AdminSettings() {
   const [success, setSuccess] = useState(false)
 
   if (session?.type !== 'admin') return null
+  const admin = session.account
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setSuccess(false)
 
-    const valid = await verifyPassword(currentPassword, session.account.passwordHash)
+    const valid = await verifyPassword(currentPassword, admin.passwordHash)
     if (!valid) {
       setError('Current password is incorrect.')
       return
@@ -34,7 +35,7 @@ export default function AdminSettings() {
     }
 
     const passwordHash = await hashPassword(newPassword)
-    await db.admins.update(session.account.id, { passwordHash })
+    await db.admins.update(admin.id, { passwordHash })
     await refreshSession()
     setCurrentPassword('')
     setNewPassword('')
@@ -47,7 +48,7 @@ export default function AdminSettings() {
       <div className="bg-white rounded-xl shadow-sm p-6 max-w-md">
         <h3 className="font-medium text-gray-800 mb-1">Change Password</h3>
         <p className="text-sm text-gray-500 mb-4">
-          Signed in as <span className="font-medium">{session.account.fullName}</span> ({session.account.role})
+          Signed in as <span className="font-medium">{admin.fullName}</span> ({admin.role})
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="Current Password" value={currentPassword} onChange={setCurrentPassword} />

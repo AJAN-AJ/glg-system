@@ -28,7 +28,8 @@ This is **Phase 1** of a phased build. See "Roadmap" below for what's coming nex
   - Due-date reminders appear on both the admin Loans page and the member's own dashboard starting 7 days before the due date (and continue showing if overdue)
   - Loan auto-marks as "Completed" once fully repaid
 - **Member dashboard** — share contribution history, monthly pledge comparison, loan request button, and full loan history with live repayment progress
-- **Installable PWA** — proper app icon (golden ladder mark on green background), maskable icon for Android adaptive icons, Apple touch icon for iOS "Add to Home Screen," works offline once loaded
+- **Installable PWA** — uses the group's real logo throughout (login screen, headers, app icon, browser favicon, "Add to Home Screen" icon on Android/iOS), in the actual brand colors pulled from the logo (navy blue `#00205B` and gold `#9C6312`)
+- **Member profile form matches the group's real Google Form** — phone (WhatsApp), email, monthly share, next of kin, the exact constitution agreement text with an "I Agree" checkbox, a typed signature field, and a note about the MK 3,000 once-off registration fee
 - **Error boundary** — if something unexpected breaks in one screen, the user sees a friendly "reload app" message instead of a blank white screen
 - **Mobile-friendly admin navigation** — collapses into a hamburger menu on small screens, since admins will likely use this on phones in the field
 

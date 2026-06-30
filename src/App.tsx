@@ -14,9 +14,7 @@ function Loading() {
   return (
     <div className="min-h-screen bg-glg-50 flex items-center justify-center">
       <div className="text-center">
-        <div className="w-12 h-12 rounded-xl bg-glg-700 mx-auto mb-3 flex items-center justify-center text-glg-400 font-bold animate-pulse">
-          GLG
-        </div>
+        <img src="/brand/logo.png" alt="Golden Ladder Group" className="w-16 h-16 mx-auto mb-3 object-contain animate-pulse" />
         <p className="text-sm text-glg-700">Loading Golden Ladder Group…</p>
       </div>
     </div>
