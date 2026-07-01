@@ -4,7 +4,7 @@ import { db } from '../db/database'
 import { hashPassword, verifyPassword } from '../utils/auth'
 import { useAuth } from '../context/AuthContext'
 import AdminLayout from '../components/AdminLayout'
-import type { Member, AdminRole, AdminPermission } from '../types'
+import type { Member, AdminRole, AdminPermission, GroupConfig, LoanType } from '../types'
 
 export default function AdminSettings() {
   const { session, isChair } = useAuth()
@@ -14,10 +14,125 @@ export default function AdminSettings() {
     <AdminLayout title="Settings">
       <div className="space-y-6 max-w-xl">
         <ChangePasswordSection member={session.account} />
+        {isChair && <GroupConfigSection />}
         {isChair && <AdminManagementSection currentAdminId={session.account.id} />}
         <RegistrationFundSection />
       </div>
     </AdminLayout>
+  )
+}
+
+// ── Group Configuration (Chair only) ─────────────────────────────────────────
+const LOAN_TYPES: LoanType[] = ['normal', 'soft', 'investment', 'emergency']
+const LOAN_TYPE_LABELS: Record<LoanType, string> = {
+  normal: 'Normal', soft: 'Soft', investment: 'Investment', emergency: 'Emergency'
+}
+
+function GroupConfigSection() {
+  const config = useLiveQuery(() => db.groupConfig.get('main'), [])
+  const [deadlineDay, setDeadlineDay] = useState('')
+  const [flatFee, setFlatFee] = useState('')
+  const [extraFee, setExtraFee] = useState('')
+  const [extraDaysThreshold, setExtraDaysThreshold] = useState('')
+  const [loanRates, setLoanRates] = useState<Record<LoanType, string>>({ normal: '', soft: '', investment: '', emergency: '' })
+  const [loanDurations, setLoanDurations] = useState<Record<LoanType, string>>({ normal: '', soft: '', investment: '', emergency: '' })
+  const [loaded, setLoaded] = useState(false)
+  const [success, setSuccess] = useState(false)
+
+  // Populate form once config loads
+  if (config && !loaded) {
+    setDeadlineDay(String(config.penaltyDeadlineDay))
+    setFlatFee(String(config.penaltyFlatFee))
+    setExtraFee(String(config.penaltyExtraFee))
+    setExtraDaysThreshold(String(config.penaltyExtraDaysThreshold))
+    const rates: Record<LoanType, string> = { normal: '', soft: '', investment: '', emergency: '' }
+    const durations: Record<LoanType, string> = { normal: '', soft: '', investment: '', emergency: '' }
+    LOAN_TYPES.forEach((t) => {
+      rates[t] = String((config.loanDefaults[t].interestRate * 100).toFixed(0))
+      durations[t] = String(config.loanDefaults[t].durationMonths)
+    })
+    setLoanRates(rates)
+    setLoanDurations(durations)
+    setLoaded(true)
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    const updated: GroupConfig = {
+      id: 'main',
+      penaltyDeadlineDay: Number(deadlineDay),
+      penaltyFlatFee: Number(flatFee),
+      penaltyExtraFee: Number(extraFee),
+      penaltyExtraDaysThreshold: Number(extraDaysThreshold),
+      loanDefaults: {
+        normal:     { interestRate: Number(loanRates.normal) / 100,     durationMonths: Number(loanDurations.normal) },
+        soft:       { interestRate: Number(loanRates.soft) / 100,       durationMonths: Number(loanDurations.soft) },
+        investment: { interestRate: Number(loanRates.investment) / 100, durationMonths: Number(loanDurations.investment) },
+        emergency:  { interestRate: Number(loanRates.emergency) / 100,  durationMonths: Number(loanDurations.emergency) }
+      }
+    }
+    await db.groupConfig.put(updated)
+    setSuccess(true)
+    setTimeout(() => setSuccess(false), 3000)
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5">
+      <h3 className="font-semibold text-gray-800 mb-1">Group Configuration</h3>
+      <p className="text-xs text-gray-500 mb-4">Chair-only. Changes apply immediately.</p>
+      <form onSubmit={handleSave} className="space-y-5">
+        {/* Penalty settings */}
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-2">Penalty Rules</p>
+          <div className="grid grid-cols-2 gap-3">
+            <CfgField label="Payment deadline (day of month)" value={deadlineDay} onChange={setDeadlineDay} min={1} max={28} />
+            <CfgField label="Late fee (MK)" value={flatFee} onChange={setFlatFee} />
+            <CfgField label="Extra fee (MK)" value={extraFee} onChange={setExtraFee} />
+            <CfgField label="Extra fee after (days past deadline)" value={extraDaysThreshold} onChange={setExtraDaysThreshold} />
+          </div>
+        </div>
+
+        {/* Loan type defaults */}
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-2">Loan Type Defaults (auto-fill on approval, can be overridden)</p>
+          <div className="space-y-3">
+            {LOAN_TYPES.map((type) => (
+              <div key={type} className="border border-gray-100 rounded-lg p-3">
+                <p className="text-sm font-medium text-gray-700 mb-2">{LOAN_TYPE_LABELS[type]}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <CfgField label="Default interest (%)" value={loanRates[type]} onChange={(v) => setLoanRates((prev) => ({ ...prev, [type]: v }))} />
+                  <CfgField label="Default duration (months)" value={loanDurations[type]} onChange={(v) => setLoanDurations((prev) => ({ ...prev, [type]: v }))} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {success && <p className="text-sm text-green-600">Configuration saved.</p>}
+        <button type="submit" className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+          Save Configuration
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function CfgField({ label, value, onChange, min, max }: {
+  label: string; value: string; onChange: (v: string) => void; min?: number; max?: number
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        min={min}
+        max={max}
+        required
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-glg-600"
+      />
+    </div>
   )
 }
 

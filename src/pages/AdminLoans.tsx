@@ -20,6 +20,7 @@ export default function AdminLoans() {
   const members = useLiveQuery(() => db.members.toArray(), []) ?? []
   const repayments = useLiveQuery(() => db.loanRepayments.toArray(), []) ?? []
   const [selected, setSelected] = useState<Loan | null>(null)
+  const config = useLiveQuery(() => db.groupConfig.get('main'), [])
   const [typeFilter, setTypeFilter] = useState<'all' | LoanType>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | Loan['status']>('all')
 
@@ -169,6 +170,8 @@ export default function AdminLoans() {
           repayments={repayments.filter((r) => r.loanId === selected.id)}
           adminId={session.account.id}
           canWrite={canWrite}
+          defaultInterestRate={config?.loanDefaults[selected.loanType]?.interestRate ?? 0.2}
+          defaultDuration={config?.loanDefaults[selected.loanType]?.durationMonths ?? 3}
           onClose={() => setSelected(null)}
         />
       )}
@@ -204,19 +207,25 @@ function LoanStatusBadge({ status }: { status: Loan['status'] }) {
 
 // Admin sets interest + duration only when approving — not the member
 function LoanDetailModal({
-  loan, memberName, repayments, adminId, canWrite, onClose
+  loan, memberName, repayments, adminId, canWrite,
+  defaultInterestRate, defaultDuration, onClose
 }: {
   loan: Loan
   memberName: string
   repayments: { id: string; amount: number; principalPortion: number; interestPortion: number; memberInterestShare: number; groupInterestShare: number; paidAt: string }[]
   adminId: string
   canWrite: boolean
+  defaultInterestRate: number
+  defaultDuration: number
   onClose: () => void
 }) {
   const [repayAmount, setRepayAmount] = useState('')
-  // Admin sets these when approving
-  const [interestRate, setInterestRate] = useState('20')
-  const [durationMonths, setDurationMonths] = useState('3')
+  const [interestRate, setInterestRate] = useState(
+    loan.status === 'requested' ? String((defaultInterestRate * 100).toFixed(0)) : String((loan.interestRate * 100).toFixed(0))
+  )
+  const [durationMonths, setDurationMonths] = useState(
+    loan.status === 'requested' ? String(defaultDuration) : String(loan.durationMonths)
+  )
 
   const totalPayable = calculateTotalPayable(loan.principal, loan.interestRate)
   const totalRepaid = repayments.reduce((sum, r) => sum + r.amount, 0)

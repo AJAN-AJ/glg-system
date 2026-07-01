@@ -4,6 +4,7 @@ import { db } from '../db/database'
 import { useAuth } from '../context/AuthContext'
 import { calculateTotalPayable, daysUntil } from '../utils/loanMath'
 import { generateId, generateLoanCode } from '../utils/auth'
+import { calculateGroupInterestDistribution } from '../utils/interestDistribution'
 import type { LoanType } from '../types'
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -20,6 +21,9 @@ export default function MemberDashboard() {
     [memberId]
   ) ?? []
   const repayments = useLiveQuery(() => db.loanRepayments.toArray(), []) ?? []
+  const allMembers = useLiveQuery(() => db.members.toArray(), []) ?? []
+  const allContributions = useLiveQuery(() => db.shareContributions.toArray(), []) ?? []
+  const allLoans = useLiveQuery(() => db.loans.toArray(), []) ?? []
   const [showRequest, setShowRequest] = useState(false)
 
   if (!session?.account) return null
@@ -28,6 +32,9 @@ export default function MemberDashboard() {
   const currentYear = new Date().getFullYear()
   const thisYearContributions = contributions.filter((c) => c.year === currentYear)
   const activeLoan = loans.find((l) => l.status === 'in_progress' || l.status === 'disbursed' || l.status === 'approved' || l.status === 'requested')
+
+  const dist = calculateGroupInterestDistribution(allMembers, allContributions, repayments, allLoans)
+  const myInterestShare = dist.memberShares.find((ms) => ms.memberId === memberId)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -54,6 +61,24 @@ export default function MemberDashboard() {
             <p className="text-2xl font-bold text-glg-700">MK {(member.monthlyShareTarget ?? 0).toLocaleString()}</p>
             <p className="text-xs text-gray-500 mt-1">Your Monthly Pledge</p>
           </div>
+        </div>
+
+        {/* Interest share card */}
+        <div className={`rounded-xl p-4 ${dist.distributable ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-100'}`}>
+          <p className="text-sm font-medium text-gray-700">Your Share of Group Interest</p>
+          <p className="text-2xl font-bold text-glg-700 mt-1">
+            MK {(myInterestShare?.interestShare ?? 0).toLocaleString()}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {dist.distributable
+              ? '✅ All group loans are repaid — your interest share is ready for distribution.'
+              : '⏳ Interest shares will be distributable once all group loans are fully repaid.'}
+          </p>
+          {myInterestShare && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              Based on your {(myInterestShare.ratio * 100).toFixed(1)}% share of total group contributions
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-4">

@@ -57,6 +57,34 @@ export interface ShareContribution {
 
 export type LoanType = 'normal' | 'soft' | 'investment' | 'emergency'
 
+export interface LoanTypeConfig {
+  interestRate: number
+  durationMonths: number
+}
+
+export interface GroupConfig {
+  id: 'main'
+  penaltyDeadlineDay: number
+  penaltyFlatFee: number
+  penaltyExtraFee: number
+  penaltyExtraDaysThreshold: number
+  loanDefaults: Record<LoanType, LoanTypeConfig>
+}
+
+export interface LoanTypeConfig {
+  interestRate: number   // e.g. 0.2 for 20%
+  durationMonths: number
+}
+
+export interface GroupConfig {
+  id: 'main'
+  penaltyDeadlineDay: number        // day of month after which member is late (1–28)
+  penaltyFlatFee: number            // MK charged on first flag
+  penaltyExtraFee: number           // extra MK if still unpaid past extraDaysThreshold
+  penaltyExtraDaysThreshold: number // days after deadline before extra fee applies
+  loanDefaults: Record<LoanType, LoanTypeConfig>
+}
+
 export type LoanStatus =
   | 'requested'
   | 'approved'

@@ -6,6 +6,9 @@ import AdminMembers from './pages/AdminMembers'
 import AdminShares from './pages/AdminShares'
 import AdminLoans from './pages/AdminLoans'
 import AdminSettings from './pages/AdminSettings'
+import AdminPenalties from './pages/AdminPenalties'
+import AdminPenalties from './pages/AdminPenalties'
+import AdminGroupInterest from './pages/AdminGroupInterest'
 import MemberFirstLogin from './pages/MemberFirstLogin'
 import MemberDashboard from './pages/MemberDashboard'
 import PendingApproval from './pages/PendingApproval'
@@ -36,6 +39,8 @@ export default function App() {
         <Route path="/admin/members" element={isAdmin ? <AdminMembers /> : <Navigate to="/login" replace />} />
         <Route path="/admin/shares" element={isAdmin ? <AdminShares /> : <Navigate to="/login" replace />} />
         <Route path="/admin/loans" element={isAdmin ? <AdminLoans /> : <Navigate to="/login" replace />} />
+        <Route path="/admin/penalties" element={isAdmin ? <AdminPenalties /> : <Navigate to="/login" replace />} />
+        <Route path="/admin/interest" element={isAdmin ? <AdminGroupInterest /> : <Navigate to="/login" replace />} />
         <Route path="/admin/settings" element={isAdmin ? <AdminSettings /> : <Navigate to="/login" replace />} />
 
         {/* Member routes */}

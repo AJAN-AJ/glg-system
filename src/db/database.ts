@@ -1,12 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  Member,
-  ShareContribution,
-  Loan,
-  LoanRepayment,
-  RegistrationFeePayment,
-  Penalty,
-  AuditLogEntry
+  Member, ShareContribution, Loan, LoanRepayment,
+  RegistrationFeePayment, Penalty, AuditLogEntry, GroupConfig
 } from '../types'
 
 export class GLGDatabase extends Dexie {
@@ -17,6 +12,7 @@ export class GLGDatabase extends Dexie {
   registrationFees!: Table<RegistrationFeePayment, string>
   penalties!: Table<Penalty, string>
   auditLog!: Table<AuditLogEntry, string>
+  groupConfig!: Table<GroupConfig, string>
 
   constructor() {
     super('glg-system-db')
@@ -30,18 +26,13 @@ export class GLGDatabase extends Dexie {
       penalties: 'id, memberId, status',
       auditLog: 'id, actorId, timestamp'
     })
-    this.version(2).stores({
-      members: 'id, memberId, username, status, dateJoined'
-    })
-    this.version(3).stores({
-      loans: 'id, loanCode, memberId, status, requestedAt'
-    })
-    // Version 4: unified accounts — admins are now Members with isAdmin flag.
-    // The old 'admins' table is dropped; all logins go through 'members'.
+    this.version(2).stores({ members: 'id, memberId, username, status, dateJoined' })
+    this.version(3).stores({ loans: 'id, loanCode, memberId, status, requestedAt' })
     this.version(4).stores({
-      admins: null, // drop the old admins table
+      admins: null,
       members: 'id, memberId, username, status, dateJoined, isAdmin'
     })
+    this.version(5).stores({ groupConfig: 'id' })
   }
 }
 

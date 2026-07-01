@@ -8,6 +8,8 @@ const navItems = [
   { to: '/admin/members', label: 'Members', icon: '👥' },
   { to: '/admin/shares', label: 'Shares', icon: '💰' },
   { to: '/admin/loans', label: 'Loans', icon: '📋' },
+  { to: '/admin/penalties', label: 'Penalties', icon: '⚠️' },
+  { to: '/admin/interest', label: 'Group Interest', icon: '📈' },
   { to: '/admin/settings', label: 'Settings', icon: '⚙️' }
 ]
 
