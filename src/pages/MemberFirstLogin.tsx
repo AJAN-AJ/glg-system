@@ -4,13 +4,13 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../db/database'
 
 export default function MemberFirstLogin() {
-  const { session, changeMemberPassword, refreshSession } = useAuth()
+  const { session, changePassword, refreshSession } = useAuth()
   const navigate = useNavigate()
   const [step, setStep] = useState<'password' | 'profile'>(
-    session?.type === 'member' && !session.account.mustChangePassword ? 'profile' : 'password'
+    session?.account && !session.account.mustChangePassword ? 'profile' : 'password'
   )
 
-  if (session?.type !== 'member') return null
+  if (!session?.account) return null
 
   return (
     <div className="min-h-screen bg-glg-50 flex items-center justify-center p-4">
@@ -18,7 +18,7 @@ export default function MemberFirstLogin() {
         {step === 'password' ? (
           <PasswordStep
             onDone={async (newPassword) => {
-              await changeMemberPassword(newPassword)
+              await changePassword(newPassword)
               setStep('profile')
             }}
           />

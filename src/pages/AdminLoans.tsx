@@ -5,15 +5,23 @@ import { generateId, generateLoanCode } from '../utils/auth'
 import { calculateTotalPayable, daysUntil, splitRepayment, addMonths } from '../utils/loanMath'
 import { useAuth } from '../context/AuthContext'
 import AdminLayout from '../components/AdminLayout'
-import type { Loan } from '../types'
+import type { Loan, LoanType } from '../types'
+
+const LOAN_TYPE_LABELS: Record<LoanType, string> = {
+  normal: 'Normal',
+  soft: 'Soft',
+  investment: 'Investment',
+  emergency: 'Emergency'
+}
 
 export default function AdminLoans() {
-  const { session } = useAuth()
+  const { session, canWrite } = useAuth()
   const loans = useLiveQuery(() => db.loans.orderBy('requestedAt').reverse().toArray(), []) ?? []
   const members = useLiveQuery(() => db.members.toArray(), []) ?? []
   const repayments = useLiveQuery(() => db.loanRepayments.toArray(), []) ?? []
   const [selected, setSelected] = useState<Loan | null>(null)
-  const [showCreate, setShowCreate] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'all' | LoanType>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | Loan['status']>('all')
 
   function memberName(memberId: string) {
     const m = members.find((mm) => mm.id === memberId)
@@ -26,83 +34,156 @@ export default function AdminLoans() {
 
   const dueSoon = loans.filter((l) => {
     if (!l.dueDate || (l.status !== 'in_progress' && l.status !== 'disbursed')) return false
-    const d = daysUntil(l.dueDate)
-    return d <= 7
+    return daysUntil(l.dueDate) <= 7
+  })
+
+  const filtered = loans.filter((l) => {
+    if (typeFilter !== 'all' && l.loanType !== typeFilter) return false
+    if (statusFilter !== 'all' && l.status !== statusFilter) return false
+    return true
   })
 
   return (
     <AdminLayout title="Loans">
       {dueSoon.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 mb-4">
-          <p className="font-medium mb-1">Repayment reminders</p>
+          <p className="font-medium mb-1">⚠️ Repayment Reminders</p>
           {dueSoon.map((l) => {
             const d = daysUntil(l.dueDate!)
             return (
               <p key={l.id}>
-                {memberName(l.memberId)} ({l.loanCode}) — {d < 0 ? `${Math.abs(d)} day(s) overdue` : d === 0 ? 'due today' : `due in ${d} day(s)`}
+                {memberName(l.memberId)} · {l.loanCode} ({LOAN_TYPE_LABELS[l.loanType]}) —{' '}
+                {d < 0 ? `${Math.abs(d)} day(s) overdue` : d === 0 ? 'due today' : `due in ${d} day(s)`}
               </p>
             )
           })}
         </div>
       )}
 
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={() => setShowCreate(true)}
-          className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+          className="border border-gray-300 rounded-lg px-2 py-2 text-sm"
         >
-          + Record Loan Request
-        </button>
+          <option value="all">All types</option>
+          <option value="normal">Normal</option>
+          <option value="soft">Soft</option>
+          <option value="investment">Investment</option>
+          <option value="emergency">Emergency</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+          className="border border-gray-300 rounded-lg px-2 py-2 text-sm"
+        >
+          <option value="all">All statuses</option>
+          <option value="requested">Requested</option>
+          <option value="approved">Approved</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="rejected">Rejected</option>
+        </select>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* Desktop table */}
+      <div className="hidden sm:block bg-white rounded-xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-left">
             <tr>
-              <th className="px-4 py-2">Loan Code</th>
+              <th className="px-4 py-2">Code</th>
               <th className="px-4 py-2">Member</th>
+              <th className="px-4 py-2">Type</th>
               <th className="px-4 py-2">Principal</th>
               <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Repaid</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
-            {loans.map((l) => (
+            {filtered.map((l) => (
               <tr key={l.id} className="border-t border-gray-100">
-                <td className="px-4 py-2 font-mono">{l.loanCode}</td>
+                <td className="px-4 py-2 font-mono text-xs">{l.loanCode}</td>
                 <td className="px-4 py-2">{memberName(l.memberId)}</td>
+                <td className="px-4 py-2"><LoanTypeBadge type={l.loanType} /></td>
                 <td className="px-4 py-2">MK {l.principal.toLocaleString()}</td>
                 <td className="px-4 py-2"><LoanStatusBadge status={l.status} /></td>
-                <td className="px-4 py-2">MK {totalRepaid(l.id).toLocaleString()} / {calculateTotalPayable(l.principal, l.interestRate).toLocaleString()}</td>
                 <td className="px-4 py-2 text-right">
-                  <button onClick={() => setSelected(l)} className="text-glg-600 hover:underline text-xs">
+                  <button onClick={() => setSelected(l)} className="text-glg-600 hover:underline text-xs font-medium">
                     Manage
                   </button>
                 </td>
               </tr>
             ))}
-            {loans.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No loans recorded yet.</td></tr>
+            {filtered.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No loan requests yet.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {showCreate && session?.type === 'admin' && (
-        <CreateLoanModal members={members} onClose={() => setShowCreate(false)} />
-      )}
-      {selected && session?.type === 'admin' && (
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-2">
+        {filtered.map((l) => {
+          const repaid = totalRepaid(l.id)
+          const totalPayable = calculateTotalPayable(l.principal, l.interestRate)
+          return (
+            <div key={l.id} className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-gray-400">{l.loanCode}</span>
+                    <LoanTypeBadge type={l.loanType} />
+                    <LoanStatusBadge status={l.status} />
+                  </div>
+                  <p className="font-medium text-gray-800 mt-1">{memberName(l.memberId)}</p>
+                  <p className="text-sm text-gray-500">MK {l.principal.toLocaleString()}</p>
+                  {(l.status === 'in_progress' || l.status === 'disbursed') && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Repaid MK {repaid.toLocaleString()} / MK {totalPayable.toLocaleString()}
+                    </p>
+                  )}
+                  {l.dueDate && (l.status === 'in_progress' || l.status === 'disbursed') && (
+                    <p className="text-xs text-amber-600 mt-0.5">Due: {new Date(l.dueDate).toLocaleDateString()}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSelected(l)}
+                  className="ml-3 shrink-0 text-sm font-medium text-glg-600 hover:text-glg-700"
+                >
+                  Manage
+                </button>
+              </div>
+            </div>
+          )
+        })}
+        {filtered.length === 0 && (
+          <p className="text-center text-gray-400 py-6 text-sm">No loan requests yet.</p>
+        )}
+      </div>
+
+      {selected && session && (
         <LoanDetailModal
           loan={selected}
           memberName={memberName(selected.memberId)}
           repayments={repayments.filter((r) => r.loanId === selected.id)}
           adminId={session.account.id}
+          canWrite={canWrite}
           onClose={() => setSelected(null)}
         />
       )}
     </AdminLayout>
   )
+}
+
+function LoanTypeBadge({ type }: { type: LoanType }) {
+  const styles: Record<LoanType, string> = {
+    normal: 'bg-blue-50 text-blue-700',
+    soft: 'bg-purple-50 text-purple-700',
+    investment: 'bg-green-50 text-green-700',
+    emergency: 'bg-red-50 text-red-700'
+  }
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${styles[type]}`}>{LOAN_TYPE_LABELS[type]}</span>
 }
 
 function LoanStatusBadge({ status }: { status: Loan['status'] }) {
@@ -115,104 +196,42 @@ function LoanStatusBadge({ status }: { status: Loan['status'] }) {
     rejected: 'bg-red-100 text-red-700'
   }
   const labels: Record<Loan['status'], string> = {
-    requested: 'Requested',
-    approved: 'Approved',
-    disbursed: 'Disbursed',
-    in_progress: 'In Progress',
-    completed: 'Completed',
-    rejected: 'Rejected'
+    requested: 'Requested', approved: 'Approved', disbursed: 'Disbursed',
+    in_progress: 'In Progress', completed: 'Completed', rejected: 'Rejected'
   }
-  return <span className={`text-xs px-2 py-1 rounded-full ${styles[status]}`}>{labels[status]}</span>
+  return <span className={`text-xs px-2 py-0.5 rounded-full ${styles[status]}`}>{labels[status]}</span>
 }
 
-function CreateLoanModal({ members, onClose }: { members: { id: string; firstName: string; surname: string; status: string }[]; onClose: () => void }) {
-  const activeMembers = members.filter((m) => m.status === 'active')
-  const [memberId, setMemberId] = useState('')
-  const [principal, setPrincipal] = useState('')
-  const [interestRate, setInterestRate] = useState('20')
-  const [durationMonths, setDurationMonths] = useState('3')
-  const [remarks, setRemarks] = useState('')
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    const year = new Date().getFullYear()
-    const sequence = (await db.loans.count()) + 1
-    await db.loans.add({
-      id: generateId(),
-      loanCode: generateLoanCode(sequence, year),
-      memberId,
-      principal: Number(principal),
-      interestRate: Number(interestRate) / 100,
-      durationMonths: Number(durationMonths),
-      status: 'requested',
-      requestedAt: new Date().toISOString(),
-      remarks
-    })
-    onClose()
-  }
-
-  return (
-    <Modal onClose={onClose}>
-      <form onSubmit={handleCreate} className="space-y-4">
-        <h3 className="font-semibold text-gray-800">Record Loan Request</h3>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Member</label>
-          <select
-            value={memberId}
-            onChange={(e) => setMemberId(e.target.value)}
-            required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">Select member…</option>
-            {activeMembers.map((m) => (
-              <option key={m.id} value={m.id}>{m.firstName} {m.surname}</option>
-            ))}
-          </select>
-        </div>
-        <NumField label="Principal Amount (MK)" value={principal} onChange={setPrincipal} />
-        <NumField label="Interest Rate (%)" value={interestRate} onChange={setInterestRate} />
-        <NumField label="Duration (months)" value={durationMonths} onChange={setDurationMonths} />
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Remarks (optional)</label>
-          <input
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2"
-          />
-        </div>
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="text-sm px-4 py-2 rounded-lg text-gray-500">
-            Cancel
-          </button>
-          <button type="submit" className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
-            Save Request
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
+// Admin sets interest + duration only when approving — not the member
 function LoanDetailModal({
-  loan,
-  memberName,
-  repayments,
-  adminId,
-  onClose
+  loan, memberName, repayments, adminId, canWrite, onClose
 }: {
   loan: Loan
   memberName: string
   repayments: { id: string; amount: number; principalPortion: number; interestPortion: number; memberInterestShare: number; groupInterestShare: number; paidAt: string }[]
   adminId: string
+  canWrite: boolean
   onClose: () => void
 }) {
   const [repayAmount, setRepayAmount] = useState('')
+  // Admin sets these when approving
+  const [interestRate, setInterestRate] = useState('20')
+  const [durationMonths, setDurationMonths] = useState('3')
+
   const totalPayable = calculateTotalPayable(loan.principal, loan.interestRate)
   const totalRepaid = repayments.reduce((sum, r) => sum + r.amount, 0)
   const outstanding = Math.max(0, totalPayable - totalRepaid)
 
   async function approve() {
-    await db.loans.update(loan.id, { status: 'approved', approvedByAdminId: adminId, approvedAt: new Date().toISOString() })
+    const rate = Number(interestRate) / 100
+    const duration = Number(durationMonths)
+    await db.loans.update(loan.id, {
+      status: 'approved',
+      interestRate: rate,
+      durationMonths: duration,
+      approvedByAdminId: adminId,
+      approvedAt: new Date().toISOString()
+    })
     onClose()
   }
 
@@ -241,15 +260,11 @@ function LoanDetailModal({
       id: generateId(),
       loanId: loan.id,
       amount,
-      principalPortion: split.principalPortion,
-      interestPortion: split.interestPortion,
-      memberInterestShare: split.memberInterestShare,
-      groupInterestShare: split.groupInterestShare,
+      ...split,
       paidAt: new Date().toISOString(),
       recordedByAdminId: adminId
     })
-    const newTotalRepaid = totalRepaid + amount
-    if (newTotalRepaid >= totalPayable) {
+    if (totalRepaid + amount >= totalPayable) {
       await db.loans.update(loan.id, { status: 'completed' })
     }
     setRepayAmount('')
@@ -257,25 +272,59 @@ function LoanDetailModal({
 
   return (
     <Modal onClose={onClose}>
-      <h3 className="font-semibold text-gray-800 mb-1">{loan.loanCode} — {memberName}</h3>
-      <div className="text-sm text-gray-600 space-y-1 mb-4">
-        <p>Principal: MK {loan.principal.toLocaleString()} · Interest: {(loan.interestRate * 100).toFixed(0)}% · {loan.durationMonths} month(s)</p>
-        <p>Total Payable: MK {totalPayable.toLocaleString()}</p>
-        <p>Repaid so far: MK {totalRepaid.toLocaleString()} · Outstanding: MK {outstanding.toLocaleString()}</p>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <h3 className="font-semibold text-gray-800">{loan.loanCode}</h3>
+        <LoanTypeBadge type={loan.loanType} />
+        <LoanStatusBadge status={loan.status} />
+      </div>
+      <p className="text-sm text-gray-600 mb-1">{memberName}</p>
+      <div className="text-sm text-gray-600 space-y-0.5 mb-4">
+        <p>Requested Amount: <strong>MK {loan.principal.toLocaleString()}</strong></p>
+        {loan.status !== 'requested' && (
+          <>
+            <p>Interest Rate: {(loan.interestRate * 100).toFixed(0)}% · Duration: {loan.durationMonths} month(s)</p>
+            <p>Total Payable: MK {totalPayable.toLocaleString()}</p>
+            <p>Repaid: MK {totalRepaid.toLocaleString()} · Outstanding: MK {outstanding.toLocaleString()}</p>
+          </>
+        )}
         {loan.dueDate && <p>Due: {new Date(loan.dueDate).toLocaleDateString()}</p>}
-        <p>Status: <LoanStatusBadge status={loan.status} /></p>
+        {loan.remarks && <p className="text-gray-400 italic">"{loan.remarks}"</p>}
       </div>
 
-      {loan.status === 'requested' && (
-        <div className="flex justify-end gap-2 mb-4">
-          <button onClick={reject} className="text-sm px-4 py-2 rounded-lg text-red-600 hover:bg-red-50">Reject</button>
-          <button onClick={approve} className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
-            Approve
-          </button>
+      {/* Approve — admin sets interest + duration here */}
+      {loan.status === 'requested' && canWrite && (
+        <div className="bg-glg-50 border border-glg-100 rounded-lg p-3 mb-4 space-y-3">
+          <p className="text-sm font-medium text-glg-700">Set Loan Terms</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Interest Rate (%)</label>
+              <input
+                type="number"
+                value={interestRate}
+                onChange={(e) => setInterestRate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Duration (months)</label>
+              <input
+                type="number"
+                value={durationMonths}
+                onChange={(e) => setDurationMonths(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={reject} className="text-sm px-4 py-2 rounded-lg text-red-600 hover:bg-red-50">Reject</button>
+            <button onClick={approve} className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+              Approve with These Terms
+            </button>
+          </div>
         </div>
       )}
 
-      {loan.status === 'approved' && (
+      {loan.status === 'approved' && canWrite && (
         <div className="flex justify-end mb-4">
           <button onClick={disburse} className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
             Mark as Disbursed
@@ -283,7 +332,7 @@ function LoanDetailModal({
         </div>
       )}
 
-      {(loan.status === 'in_progress' || loan.status === 'disbursed') && (
+      {(loan.status === 'in_progress' || loan.status === 'disbursed') && canWrite && (
         <form onSubmit={recordRepayment} className="bg-gray-50 rounded-lg p-3 mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">Record Repayment (MK)</label>
           <div className="flex gap-2">
@@ -303,32 +352,21 @@ function LoanDetailModal({
       {repayments.length > 0 && (
         <div>
           <p className="text-sm font-medium text-gray-700 mb-2">Repayment History</p>
-          <div className="space-y-1 text-xs text-gray-500 max-h-40 overflow-y-auto">
+          <div className="space-y-1 text-xs text-gray-500 max-h-36 overflow-y-auto">
             {repayments.map((r) => (
               <div key={r.id} className="flex justify-between border-b border-gray-100 py-1">
                 <span>{new Date(r.paidAt).toLocaleDateString()}</span>
-                <span>MK {r.amount.toLocaleString()} (principal {r.principalPortion.toLocaleString()}, interest {r.interestPortion.toLocaleString()})</span>
+                <span>MK {r.amount.toLocaleString()} · principal {r.principalPortion.toLocaleString()} · interest {r.interestPortion.toLocaleString()}</span>
               </div>
             ))}
           </div>
         </div>
       )}
-    </Modal>
-  )
-}
 
-function NumField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required
-        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-      />
-    </div>
+      {!canWrite && (
+        <p className="text-xs text-gray-400 italic mt-2">Read-only access — contact the Chair to take action.</p>
+      )}
+    </Modal>
   )
 }
 

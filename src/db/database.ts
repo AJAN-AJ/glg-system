@@ -1,6 +1,5 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  AdminAccount,
   Member,
   ShareContribution,
   Loan,
@@ -10,12 +9,7 @@ import type {
   AuditLogEntry
 } from '../types'
 
-// Local-first database. This is Phase 1's persistence layer: everything lives
-// in the browser's IndexedDB via Dexie. When we add the real backend later,
-// this same shape of data will move to PostgreSQL with minimal changes to
-// the app's business logic (the functions in src/utils stay the same).
 export class GLGDatabase extends Dexie {
-  admins!: Table<AdminAccount, string>
   members!: Table<Member, string>
   shareContributions!: Table<ShareContribution, string>
   loans!: Table<Loan, string>
@@ -41,6 +35,12 @@ export class GLGDatabase extends Dexie {
     })
     this.version(3).stores({
       loans: 'id, loanCode, memberId, status, requestedAt'
+    })
+    // Version 4: unified accounts — admins are now Members with isAdmin flag.
+    // The old 'admins' table is dropped; all logins go through 'members'.
+    this.version(4).stores({
+      admins: null, // drop the old admins table
+      members: 'id, memberId, username, status, dateJoined, isAdmin'
     })
   }
 }

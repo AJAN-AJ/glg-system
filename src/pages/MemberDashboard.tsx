@@ -4,12 +4,13 @@ import { db } from '../db/database'
 import { useAuth } from '../context/AuthContext'
 import { calculateTotalPayable, daysUntil } from '../utils/loanMath'
 import { generateId, generateLoanCode } from '../utils/auth'
+import type { LoanType } from '../types'
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export default function MemberDashboard() {
   const { session, logout } = useAuth()
-  const memberId = session?.type === 'member' ? session.account.id : ''
+  const memberId = session?.account.id ?? ''
   const contributions = useLiveQuery(
     () => db.shareContributions.where('memberId').equals(memberId).toArray(),
     [memberId]
@@ -21,7 +22,7 @@ export default function MemberDashboard() {
   const repayments = useLiveQuery(() => db.loanRepayments.toArray(), []) ?? []
   const [showRequest, setShowRequest] = useState(false)
 
-  if (session?.type !== 'member') return null
+  if (!session?.account) return null
   const member = session.account
   const totalShares = contributions.reduce((sum, c) => sum + c.amount, 0)
   const currentYear = new Date().getFullYear()
@@ -102,8 +103,11 @@ export default function MemberDashboard() {
                 const repaid = repayments.filter((r) => r.loanId === loan.id).reduce((sum, r) => sum + r.amount, 0)
                 return (
                   <div key={loan.id} className="border border-gray-100 rounded-lg p-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="font-mono text-xs text-gray-400">{loan.loanCode}</span>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-mono text-xs text-gray-400">{loan.loanCode}</span>
+                        <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full capitalize">{loan.loanType}</span>
+                      </div>
                       <StatusPill status={loan.status} />
                     </div>
                     <p className="mt-1">MK {loan.principal.toLocaleString()} at {(loan.interestRate * 100).toFixed(0)}% for {loan.durationMonths} month(s)</p>
@@ -161,10 +165,17 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function RequestLoanModal({ memberId, onClose }: { memberId: string; onClose: () => void }) {
+  const [loanType, setLoanType] = useState<'normal' | 'soft' | 'investment' | 'emergency'>('normal')
   const [principal, setPrincipal] = useState('')
-  const [durationMonths, setDurationMonths] = useState('3')
   const [remarks, setRemarks] = useState('')
   const [submitted, setSubmitted] = useState(false)
+
+  const loanDescriptions = {
+    normal: 'Standard loan with regular interest rate.',
+    soft: 'Low or zero interest loan for members in need.',
+    investment: 'Loan intended for a business or income-generating activity.',
+    emergency: 'Urgent loan for unexpected personal hardship.'
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -174,9 +185,10 @@ function RequestLoanModal({ memberId, onClose }: { memberId: string; onClose: ()
       id: generateId(),
       loanCode: generateLoanCode(sequence, year),
       memberId,
+      loanType,
       principal: Number(principal),
-      interestRate: 0.2, // default group rate; admin can adjust upon approval in a later iteration
-      durationMonths: Number(durationMonths),
+      interestRate: 0,      // admin will set this when approving
+      durationMonths: 0,    // admin will set this when approving
       status: 'requested',
       requestedAt: new Date().toISOString(),
       remarks
@@ -190,14 +202,41 @@ function RequestLoanModal({ memberId, onClose }: { memberId: string; onClose: ()
         {submitted ? (
           <div className="text-center space-y-3">
             <p className="text-2xl">✅</p>
-            <p className="text-sm text-gray-600">Your loan request has been submitted. An admin will review it.</p>
-            <button onClick={onClose} className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
-              Done
-            </button>
+            <p className="font-medium text-gray-800">Request Submitted</p>
+            <p className="text-sm text-gray-500">Your loan request has been submitted. An admin will review it and set the interest rate and duration before approval.</p>
+            <button onClick={onClose} className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">Done</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <h3 className="font-semibold text-gray-800">Request a Loan</h3>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Loan Type</label>
+              <div className="space-y-2">
+                {(['normal', 'soft', 'investment', 'emergency'] as const).map((type) => (
+                  <label
+                    key={type}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
+                      loanType === type ? 'border-glg-600 bg-glg-50' : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="loanType"
+                      value={type}
+                      checked={loanType === type}
+                      onChange={() => setLoanType(type)}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-800 capitalize">{type}</p>
+                      <p className="text-xs text-gray-500">{loanDescriptions[type]}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Amount Requested (MK)</label>
               <input
@@ -209,17 +248,7 @@ function RequestLoanModal({ memberId, onClose }: { memberId: string; onClose: ()
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Duration (months)</label>
-              <input
-                type="number"
-                value={durationMonths}
-                onChange={(e) => setDurationMonths(e.target.value)}
-                required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reason / Remarks (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reason / Additional Details (optional)</label>
               <textarea
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
@@ -227,10 +256,9 @@ function RequestLoanModal({ memberId, onClose }: { memberId: string; onClose: ()
                 rows={2}
               />
             </div>
+            <p className="text-xs text-gray-400">The admin will set the interest rate and repayment duration when reviewing your request.</p>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="text-sm px-4 py-2 rounded-lg text-gray-500">
-                Cancel
-              </button>
+              <button type="button" onClick={onClose} className="text-sm px-4 py-2 rounded-lg text-gray-500">Cancel</button>
               <button type="submit" className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
                 Submit Request
               </button>

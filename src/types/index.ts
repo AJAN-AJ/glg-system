@@ -1,64 +1,61 @@
 // Core domain types for Golden Ladder Group system
-// These mirror the real logic found in the group's Excel workbook.
 
 export type AdminRole = 'chair' | 'secretary' | 'treasurer'
+export type AdminPermission = 'read' | 'read_write'
 
 export type MemberStatus =
-  | 'invited'        // account created by admin, temp password issued, never logged in
-  | 'pending_setup'  // logged in with temp password, must still change password
-  | 'pending_approval' // changed password + submitted profile form, awaiting admin approval
-  | 'active'         // approved, full dashboard access
-  | 'suspended'      // admin has disabled the account
+  | 'invited'
+  | 'pending_setup'
+  | 'pending_approval'
+  | 'active'
+  | 'suspended'
 
-export interface AdminAccount {
-  id: string
-  fullName: string
-  role: AdminRole
-  username: string
-  // NOTE: passwordHash is a placeholder hashing approach for the local-first phase.
-  // When the backend is introduced, real password hashing (bcrypt/argon2) moves server-side.
-  passwordHash: string
-  createdAt: string
-}
-
+// Unified account: every user (admin or not) is a Member.
+// If isAdmin is true, they get admin UI access governed by adminPermission.
+// Only the Chair (adminRole === 'chair') can manage other admins.
 export interface Member {
   id: string
-  memberId: string // e.g. GLG26001, assigned by admin at creation
+  memberId: string // e.g. GLG26001
   firstName: string
   surname: string
-  username: string // used to log in, e.g. phone number or chosen username
+  username: string
   passwordHash: string
   mustChangePassword: boolean
   status: MemberStatus
 
-  // Filled by the member during first-login profile form (mirrors GRegister sheet)
+  // Admin fields — only set if isAdmin is true
+  isAdmin: boolean
+  adminRole?: AdminRole
+  adminPermission?: AdminPermission // 'read' | 'read_write'
+
+  // Profile (filled by member on first login)
   phoneNumber?: string
   email?: string
   nextOfKinName?: string
   nextOfKinPhone?: string
-  monthlyShareTarget?: number // MK they pledge to contribute per month
+  monthlyShareTarget?: number
   agreedToConstitution?: boolean
-  signature?: string // typed full name as signature, per the group's registration form
+  signature?: string
 
-  registrationFeeStatus: 'unpaid' | 'paid' // flat MK 3000, goes to separate fund
-  dateJoined: string // ISO date, set when account created
+  registrationFeeStatus: 'unpaid' | 'paid'
+  dateJoined: string
   dateApproved?: string
-
   createdByAdminId: string
   approvedByAdminId?: string
 }
 
-// One row per member per month, mirrors the "Shares" sheet grid.
 export interface ShareContribution {
   id: string
-  memberId: string // Member.id
+  memberId: string
   year: number
-  month: number // 1-12
-  amount: number // MK contributed for that month
+  month: number
+  amount: number
   recordedByAdminId: string
   recordedAt: string
-  depositSlipRef?: string // optional reference/number from the physical deposit slip
+  depositSlipRef?: string
 }
+
+export type LoanType = 'normal' | 'soft' | 'investment' | 'emergency'
 
 export type LoanStatus =
   | 'requested'
@@ -70,10 +67,11 @@ export type LoanStatus =
 
 export interface Loan {
   id: string
-  loanCode: string // e.g. GLG-2026-L001
+  loanCode: string
   memberId: string
+  loanType: LoanType
   principal: number
-  interestRate: number // e.g. 0.2 for 20%, 0 for soft loan
+  interestRate: number
   durationMonths: number
   disbursementDate?: string
   dueDate?: string
@@ -84,15 +82,14 @@ export interface Loan {
   remarks?: string
 }
 
-// A repayment event against a loan. Interest portion is split 50/50 per group rules.
 export interface LoanRepayment {
   id: string
   loanId: string
   amount: number
   principalPortion: number
   interestPortion: number
-  memberInterestShare: number // 50% of interestPortion -> member's personal account
-  groupInterestShare: number // 50% of interestPortion -> group account
+  memberInterestShare: number
+  groupInterestShare: number
   paidAt: string
   recordedByAdminId: string
 }
@@ -103,7 +100,7 @@ export interface RegistrationFeePayment {
   amount: number // flat MK 3000
   paidAt: string
   recordedByAdminId: string
-  // Goes into a separate fund per group decision, never mixed into Shares/Loans totals.
+  // Kept in a separate fund — never mixed with Shares or Loans totals.
 }
 
 export interface Penalty {
@@ -111,7 +108,7 @@ export interface Penalty {
   memberId: string
   description: string
   amount: number
-  monthApplied: string // e.g. "2026-02"
+  monthApplied: string
   status: 'flagged' | 'confirmed' | 'paid' | 'waived'
   flaggedAt: string
   confirmedByAdminId?: string

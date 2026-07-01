@@ -1,20 +1,29 @@
 import { db } from '../db/database'
 import { hashPassword, generateId } from './auth'
 
-// On very first run, the app has no admins at all, so no one could log in.
-// We seed one default Chair account so the group has a way in. They should
-// change this password immediately from the admin settings page.
+// Ensure there is always at least one Chair admin in the system.
+// We check for an admin member specifically — not just any member —
+// so upgrading from a previous version (which had a separate admins table)
+// doesn't leave the system with no way to log in.
 export async function ensureSeedAdmin() {
-  const count = await db.admins.count()
-  if (count > 0) return
+  const adminCount = await db.members.where('isAdmin').equals(1).count()
+  if (adminCount > 0) return
 
   const passwordHash = await hashPassword('GLG-Admin-2026')
-  await db.admins.add({
+  await db.members.add({
     id: generateId(),
-    fullName: 'Default Chair Account',
-    role: 'chair',
+    memberId: 'GLG26000',
+    firstName: 'Default',
+    surname: 'Chair',
     username: 'chair',
     passwordHash,
-    createdAt: new Date().toISOString()
+    mustChangePassword: false,
+    status: 'active',
+    isAdmin: true,
+    adminRole: 'chair',
+    adminPermission: 'read_write',
+    registrationFeeStatus: 'paid',
+    dateJoined: new Date().toISOString(),
+    createdByAdminId: 'system'
   })
 }

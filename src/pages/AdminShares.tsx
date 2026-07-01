@@ -8,7 +8,7 @@ import AdminLayout from '../components/AdminLayout'
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export default function AdminShares() {
-  const { session } = useAuth()
+  const { session, canWrite } = useAuth()
   const [year, setYear] = useState(new Date().getFullYear())
   const members = useLiveQuery(
     () => db.members.where('status').equals('active').toArray(),
@@ -32,7 +32,7 @@ export default function AdminShares() {
   }
 
   async function saveAmount() {
-    if (!editing || session?.type !== 'admin') return
+    if (!editing || !session || !canWrite) return
     const amount = Number(amountInput) || 0
     const existing = findContribution(editing.memberId, editing.month)
     if (existing) {

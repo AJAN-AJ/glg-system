@@ -22,46 +22,26 @@ function Loading() {
 }
 
 export default function App() {
-  const { session, loading } = useAuth()
+  const { session, loading, isAdmin } = useAuth()
 
   if (loading) return <Loading />
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={session ? <Navigate to="/" replace /> : <LoginPage />} />
+        <Route path="/login" element={!session ? <LoginPage /> : <Navigate to="/" replace />} />
 
         {/* Admin routes */}
-        <Route
-          path="/admin"
-          element={session?.type === 'admin' ? <AdminDashboard /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/admin/members"
-          element={session?.type === 'admin' ? <AdminMembers /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/admin/shares"
-          element={session?.type === 'admin' ? <AdminShares /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/admin/loans"
-          element={session?.type === 'admin' ? <AdminLoans /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/admin/settings"
-          element={session?.type === 'admin' ? <AdminSettings /> : <Navigate to="/login" replace />}
-        />
+        <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/login" replace />} />
+        <Route path="/admin/members" element={isAdmin ? <AdminMembers /> : <Navigate to="/login" replace />} />
+        <Route path="/admin/shares" element={isAdmin ? <AdminShares /> : <Navigate to="/login" replace />} />
+        <Route path="/admin/loans" element={isAdmin ? <AdminLoans /> : <Navigate to="/login" replace />} />
+        <Route path="/admin/settings" element={isAdmin ? <AdminSettings /> : <Navigate to="/login" replace />} />
 
         {/* Member routes */}
-        <Route path="/member/setup" element={<MemberFirstLoginGuard />} />
+        <Route path="/member/setup" element={<MemberSetupGuard />} />
         <Route path="/member/pending" element={<PendingGuard />} />
-        <Route
-          path="/member"
-          element={session?.type === 'member' && session.account.status === 'active'
-            ? <MemberDashboard />
-            : <Navigate to="/login" replace />}
-        />
+        <Route path="/member" element={<MemberDashboardGuard />} />
 
         <Route path="/" element={<RootRedirect />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -71,10 +51,9 @@ export default function App() {
 }
 
 function RootRedirect() {
-  const { session } = useAuth()
+  const { session, isAdmin } = useAuth()
   if (!session) return <Navigate to="/login" replace />
-  if (session.type === 'admin') return <Navigate to="/admin" replace />
-
+  if (isAdmin) return <Navigate to="/admin" replace />
   const status = session.account.status
   if (status === 'invited' || status === 'pending_setup') return <Navigate to="/member/setup" replace />
   if (status === 'pending_approval') return <Navigate to="/member/pending" replace />
@@ -82,18 +61,27 @@ function RootRedirect() {
   return <Navigate to="/member" replace />
 }
 
-function MemberFirstLoginGuard() {
-  const { session } = useAuth()
-  if (session?.type !== 'member') return <Navigate to="/login" replace />
-  if (session.account.status === 'pending_approval' || session.account.status === 'active') {
-    return <Navigate to="/" replace />
-  }
+function MemberSetupGuard() {
+  const { session, isAdmin } = useAuth()
+  if (!session) return <Navigate to="/login" replace />
+  if (isAdmin) return <Navigate to="/admin" replace />
+  const status = session.account.status
+  if (status === 'active') return <Navigate to="/member" replace />
+  if (status === 'pending_approval') return <Navigate to="/member/pending" replace />
   return <MemberFirstLogin />
 }
 
 function PendingGuard() {
   const { session } = useAuth()
-  if (session?.type !== 'member') return <Navigate to="/login" replace />
+  if (!session) return <Navigate to="/login" replace />
   if (session.account.status !== 'pending_approval') return <Navigate to="/" replace />
   return <PendingApproval />
+}
+
+function MemberDashboardGuard() {
+  const { session, isAdmin } = useAuth()
+  if (!session) return <Navigate to="/login" replace />
+  if (isAdmin) return <Navigate to="/admin" replace />
+  if (session.account.status !== 'active') return <Navigate to="/" replace />
+  return <MemberDashboard />
 }

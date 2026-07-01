@@ -7,7 +7,7 @@ import AdminLayout from '../components/AdminLayout'
 import type { Member } from '../types'
 
 export default function AdminMembers() {
-  const { session } = useAuth()
+  const { session, canWrite } = useAuth()
   const allMembers = useLiveQuery(() => db.members.orderBy('dateJoined').reverse().toArray(), []) ?? []
   const [showCreate, setShowCreate] = useState(false)
   const [selected, setSelected] = useState<Member | null>(null)
@@ -15,10 +15,10 @@ export default function AdminMembers() {
   const [statusFilter, setStatusFilter] = useState<'all' | Member['status']>('all')
 
   const members = allMembers.filter((m) => {
+    if (m.isAdmin && m.status === 'active' && !m.memberId) return false // skip pure admin seed
     const matchesStatus = statusFilter === 'all' || m.status === statusFilter
     const term = search.trim().toLowerCase()
-    const matchesSearch =
-      !term ||
+    const matchesSearch = !term ||
       m.firstName.toLowerCase().includes(term) ||
       m.surname.toLowerCase().includes(term) ||
       m.memberId.toLowerCase().includes(term) ||
@@ -31,10 +31,10 @@ export default function AdminMembers() {
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <input
           type="text"
-          placeholder="Search by name, Member ID, or username…"
+          placeholder="Search name, Member ID, username…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-glg-600"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px] focus:outline-none focus:ring-2 focus:ring-glg-600"
         />
         <select
           value={statusFilter}
@@ -48,21 +48,25 @@ export default function AdminMembers() {
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
         </select>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
-        >
-          + Create Member Account
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg whitespace-nowrap"
+          >
+            + Create Member
+          </button>
+        )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* Desktop table */}
+      <div className="hidden sm:block bg-white rounded-xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-left">
             <tr>
               <th className="px-4 py-2">Member ID</th>
               <th className="px-4 py-2">Name</th>
               <th className="px-4 py-2">Status</th>
+              <th className="px-4 py-2">Role</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
@@ -72,25 +76,56 @@ export default function AdminMembers() {
                 <td className="px-4 py-2 font-mono">{m.memberId}</td>
                 <td className="px-4 py-2">{m.firstName} {m.surname}</td>
                 <td className="px-4 py-2"><StatusBadge status={m.status} /></td>
+                <td className="px-4 py-2 text-xs text-gray-500">{m.isAdmin ? `${m.adminRole}` : 'Member'}</td>
                 <td className="px-4 py-2 text-right">
-                  <button onClick={() => setSelected(m)} className="text-glg-600 hover:underline text-xs">
+                  <button onClick={() => setSelected(m)} className="text-glg-600 hover:underline text-xs font-medium">
                     View
                   </button>
                 </td>
               </tr>
             ))}
             {members.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">No members yet.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">No members found.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {showCreate && session?.type === 'admin' && (
+      {/* Mobile cards — no horizontal scrolling, no hidden buttons */}
+      <div className="sm:hidden space-y-2">
+        {members.map((m) => (
+          <div key={m.id} className="bg-white rounded-xl shadow-sm p-4 flex items-start justify-between">
+            <div>
+              <p className="font-medium text-gray-800">{m.firstName} {m.surname}</p>
+              <p className="text-xs text-gray-400 font-mono mt-0.5">{m.memberId}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <StatusBadge status={m.status} />
+                {m.isAdmin && <span className="text-xs text-glg-700 bg-glg-50 px-2 py-0.5 rounded-full">{m.adminRole}</span>}
+              </div>
+            </div>
+            <button
+              onClick={() => setSelected(m)}
+              className="text-sm text-glg-600 hover:text-glg-700 font-medium ml-3 shrink-0"
+            >
+              View
+            </button>
+          </div>
+        ))}
+        {members.length === 0 && (
+          <p className="text-center text-gray-400 py-6 text-sm">No members found.</p>
+        )}
+      </div>
+
+      {showCreate && session && canWrite && (
         <CreateMemberModal adminId={session.account.id} onClose={() => setShowCreate(false)} />
       )}
-      {selected && session?.type === 'admin' && (
-        <MemberDetailModal member={selected} adminId={session.account.id} onClose={() => setSelected(null)} />
+      {selected && session && (
+        <MemberDetailModal
+          member={selected}
+          adminId={session.account.id}
+          canWrite={canWrite}
+          onClose={() => setSelected(null)}
+        />
       )}
     </AdminLayout>
   )
@@ -197,7 +232,7 @@ function CreateMemberModal({ adminId, onClose }: { adminId: string; onClose: () 
   )
 }
 
-function MemberDetailModal({ member, adminId, onClose }: { member: Member; adminId: string; onClose: () => void }) {
+function MemberDetailModal({ member, adminId, canWrite, onClose }: { member: Member; adminId: string; canWrite: boolean; onClose: () => void }) {
   const [editing, setEditing] = useState(false)
   const [firstName, setFirstName] = useState(member.firstName)
   const [surname, setSurname] = useState(member.surname)
@@ -283,26 +318,20 @@ function MemberDetailModal({ member, adminId, onClose }: { member: Member; admin
 
       {!confirmDelete ? (
         <div className="flex justify-end gap-2 flex-wrap">
-          <button onClick={() => setConfirmDelete(true)} className="text-sm px-4 py-2 rounded-lg text-red-600 hover:bg-red-50">
-            Delete
-          </button>
-          <button onClick={() => setEditing(true)} className="text-sm px-4 py-2 rounded-lg text-glg-600 hover:bg-glg-50">
-            Edit
-          </button>
-          {member.status === 'suspended' ? (
-            <button onClick={reactivate} className="text-sm px-4 py-2 rounded-lg text-green-700 hover:bg-green-50">
-              Reactivate
-            </button>
-          ) : (
-            <button onClick={suspend} className="text-sm px-4 py-2 rounded-lg text-amber-700 hover:bg-amber-50">
-              Suspend
-            </button>
+          {canWrite && <button onClick={() => setConfirmDelete(true)} className="text-sm px-4 py-2 rounded-lg text-red-600 hover:bg-red-50">Delete</button>}
+          {canWrite && <button onClick={() => setEditing(true)} className="text-sm px-4 py-2 rounded-lg text-glg-600 hover:bg-glg-50">Edit</button>}
+          {canWrite && member.status === 'suspended' && (
+            <button onClick={reactivate} className="text-sm px-4 py-2 rounded-lg text-green-700 hover:bg-green-50">Reactivate</button>
           )}
-          {member.status === 'pending_approval' && (
+          {canWrite && member.status !== 'suspended' && member.status !== 'pending_approval' && (
+            <button onClick={suspend} className="text-sm px-4 py-2 rounded-lg text-amber-700 hover:bg-amber-50">Suspend</button>
+          )}
+          {canWrite && member.status === 'pending_approval' && (
             <button onClick={approve} className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
               Approve & Activate
             </button>
           )}
+          {!canWrite && <p className="text-xs text-gray-400 italic">Read-only access — contact the Chair to make changes.</p>}
         </div>
       ) : (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
