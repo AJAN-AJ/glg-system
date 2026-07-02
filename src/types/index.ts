@@ -143,6 +143,26 @@ export interface Penalty {
   confirmedAt?: string
 }
 
+export interface BankInterestEntry {
+  id: string
+  year: number
+  month: number
+  amount: number
+  recordedByAdminId: string
+  recordedAt: string
+}
+
+export interface BankChargeEntry {
+  id: string
+  year: number
+  month: number
+  vatAmount: number
+  levyAmount: number
+  total: number // vatAmount + levyAmount
+  recordedByAdminId: string
+  recordedAt: string
+}
+
 export interface AuditLogEntry {
   id: string
   actorId: string

@@ -5,13 +5,14 @@ import AdminDashboard from './pages/AdminDashboard'
 import AdminMembers from './pages/AdminMembers'
 import AdminShares from './pages/AdminShares'
 import AdminLoans from './pages/AdminLoans'
+import AdminPenalties from './pages/AdminPenalties'
 import AdminSettings from './pages/AdminSettings'
-import AdminPenalties from './pages/AdminPenalties'
-import AdminPenalties from './pages/AdminPenalties'
-import AdminGroupInterest from './pages/AdminGroupInterest'
+import AdminBank from './pages/AdminBank'
+import AdminProjected from './pages/AdminProjected'
 import MemberFirstLogin from './pages/MemberFirstLogin'
-import MemberDashboard from './pages/MemberDashboard'
+import MemberHome from './pages/MemberHome'
 import PendingApproval from './pages/PendingApproval'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function Loading() {
   return (
@@ -26,31 +27,31 @@ function Loading() {
 
 export default function App() {
   const { session, loading, isAdmin } = useAuth()
-
   if (loading) return <Loading />
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={!session ? <LoginPage /> : <Navigate to="/" replace />} />
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/login" element={!session ? <LoginPage /> : <Navigate to="/" replace />} />
 
-        {/* Admin routes */}
-        <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/login" replace />} />
-        <Route path="/admin/members" element={isAdmin ? <AdminMembers /> : <Navigate to="/login" replace />} />
-        <Route path="/admin/shares" element={isAdmin ? <AdminShares /> : <Navigate to="/login" replace />} />
-        <Route path="/admin/loans" element={isAdmin ? <AdminLoans /> : <Navigate to="/login" replace />} />
-        <Route path="/admin/penalties" element={isAdmin ? <AdminPenalties /> : <Navigate to="/login" replace />} />
-        <Route path="/admin/interest" element={isAdmin ? <AdminGroupInterest /> : <Navigate to="/login" replace />} />
-        <Route path="/admin/settings" element={isAdmin ? <AdminSettings /> : <Navigate to="/login" replace />} />
+          <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/login" replace />} />
+          <Route path="/admin/members" element={isAdmin ? <AdminMembers /> : <Navigate to="/login" replace />} />
+          <Route path="/admin/shares" element={isAdmin ? <AdminShares /> : <Navigate to="/login" replace />} />
+          <Route path="/admin/loans" element={isAdmin ? <AdminLoans /> : <Navigate to="/login" replace />} />
+          <Route path="/admin/penalties" element={isAdmin ? <AdminPenalties /> : <Navigate to="/login" replace />} />
+          <Route path="/admin/bank" element={isAdmin ? <AdminBank /> : <Navigate to="/login" replace />} />
+          <Route path="/admin/projected" element={isAdmin ? <AdminProjected /> : <Navigate to="/login" replace />} />
+          <Route path="/admin/settings" element={isAdmin ? <AdminSettings /> : <Navigate to="/login" replace />} />
 
-        {/* Member routes */}
-        <Route path="/member/setup" element={<MemberSetupGuard />} />
-        <Route path="/member/pending" element={<PendingGuard />} />
-        <Route path="/member" element={<MemberDashboardGuard />} />
+          <Route path="/member/setup" element={<MemberSetupGuard />} />
+          <Route path="/member/pending" element={<PendingGuard />} />
+          <Route path="/member" element={<MemberDashboardGuard />} />
 
-        <Route path="/" element={<RootRedirect />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }
@@ -62,7 +63,6 @@ function RootRedirect() {
   const status = session.account.status
   if (status === 'invited' || status === 'pending_setup') return <Navigate to="/member/setup" replace />
   if (status === 'pending_approval') return <Navigate to="/member/pending" replace />
-  if (status === 'suspended') return <Navigate to="/login" replace />
   return <Navigate to="/member" replace />
 }
 
@@ -88,5 +88,5 @@ function MemberDashboardGuard() {
   if (!session) return <Navigate to="/login" replace />
   if (isAdmin) return <Navigate to="/admin" replace />
   if (session.account.status !== 'active') return <Navigate to="/" replace />
-  return <MemberDashboard />
+  return <MemberHome />
 }

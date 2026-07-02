@@ -1,7 +1,8 @@
 import Dexie, { type Table } from 'dexie'
 import type {
   Member, ShareContribution, Loan, LoanRepayment,
-  RegistrationFeePayment, Penalty, AuditLogEntry, GroupConfig
+  RegistrationFeePayment, Penalty, AuditLogEntry, GroupConfig,
+  BankInterestEntry, BankChargeEntry
 } from '../types'
 
 export class GLGDatabase extends Dexie {
@@ -13,6 +14,8 @@ export class GLGDatabase extends Dexie {
   penalties!: Table<Penalty, string>
   auditLog!: Table<AuditLogEntry, string>
   groupConfig!: Table<GroupConfig, string>
+  bankInterest!: Table<BankInterestEntry, string>
+  bankCharges!: Table<BankChargeEntry, string>
 
   constructor() {
     super('glg-system-db')
@@ -28,11 +31,12 @@ export class GLGDatabase extends Dexie {
     })
     this.version(2).stores({ members: 'id, memberId, username, status, dateJoined' })
     this.version(3).stores({ loans: 'id, loanCode, memberId, status, requestedAt' })
-    this.version(4).stores({
-      admins: null,
-      members: 'id, memberId, username, status, dateJoined, isAdmin'
-    })
+    this.version(4).stores({ admins: null, members: 'id, memberId, username, status, dateJoined, isAdmin' })
     this.version(5).stores({ groupConfig: 'id' })
+    this.version(6).stores({
+      bankInterest: 'id, year, month, [year+month]',
+      bankCharges: 'id, year, month, [year+month]'
+    })
   }
 }
 

@@ -10,7 +10,7 @@ import type { LoanType } from '../types'
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export default function MemberDashboard() {
-  const { session, logout } = useAuth()
+  const { session } = useAuth()
   const memberId = session?.account.id ?? ''
   const contributions = useLiveQuery(
     () => db.shareContributions.where('memberId').equals(memberId).toArray(),
@@ -37,22 +37,8 @@ export default function MemberDashboard() {
   const myInterestShare = dist.memberShares.find((ms) => ms.memberId === memberId)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-glg-700 text-white px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src="/brand/logo.png" alt="GLG" className="w-9 h-9 rounded-md object-contain bg-white" />
-          <div>
-            <h1 className="font-semibold">Golden Ladder Group</h1>
-            <p className="text-xs text-glg-100/80">{member.firstName} {member.surname} · {member.memberId}</p>
-          </div>
-        </div>
-        <button onClick={logout} className="text-sm bg-glg-800 hover:bg-glg-700 px-3 py-1.5 rounded-md">
-          Log out
-        </button>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-4">
           <div className="bg-white rounded-xl shadow-sm p-4">
             <p className="text-2xl font-bold text-glg-700">MK {totalShares.toLocaleString()}</p>
             <p className="text-xs text-gray-500 mt-1">Total Shares Contributed (all time)</p>
@@ -150,11 +136,6 @@ export default function MemberDashboard() {
             </div>
           )}
         </div>
-
-        <p className="text-xs text-gray-400 text-center">
-          Interest earned and your share of group interest will appear here once all group loans are fully repaid.
-        </p>
-      </main>
 
       {showRequest && (
         <RequestLoanModal memberId={member.id} onClose={() => setShowRequest(false)} />
