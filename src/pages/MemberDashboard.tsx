@@ -130,6 +130,12 @@ export default function MemberDashboard() {
                     {loan.dueDate && (loan.status === 'in_progress' || loan.status === 'disbursed') && (
                       <p className="text-xs text-gray-500">Due: {new Date(loan.dueDate).toLocaleDateString()}</p>
                     )}
+                    {loan.status === 'rejected' && loan.rejectionReason && (
+                      <div className="mt-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                        <p className="text-xs font-medium text-red-600">Rejection Reason:</p>
+                        <p className="text-xs text-red-500 mt-0.5">{loan.rejectionReason}</p>
+                      </div>
+                    )}
                   </div>
                 )
               })}

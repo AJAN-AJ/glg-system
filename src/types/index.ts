@@ -108,6 +108,7 @@ export interface Loan {
   approvedByAdminId?: string
   approvedAt?: string
   remarks?: string
+  rejectionReason?: string // set by admin when rejecting, visible to member
 }
 
 export interface LoanRepayment {

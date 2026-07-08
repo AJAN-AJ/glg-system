@@ -226,6 +226,9 @@ function LoanDetailModal({
   const [durationMonths, setDurationMonths] = useState(
     loan.status === 'requested' ? String(defaultDuration) : String(loan.durationMonths)
   )
+  const [showRejectForm, setShowRejectForm] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [rejectError, setRejectError] = useState('')
 
   const totalPayable = calculateTotalPayable(loan.principal, loan.interestRate)
   const totalRepaid = repayments.reduce((sum, r) => sum + r.amount, 0)
@@ -241,11 +244,20 @@ function LoanDetailModal({
       approvedByAdminId: adminId,
       approvedAt: new Date().toISOString()
     })
+    // TODO (backend phase): send email notification to member that loan was approved
     onClose()
   }
 
   async function reject() {
-    await db.loans.update(loan.id, { status: 'rejected' })
+    if (!rejectionReason.trim()) {
+      setRejectError('Please provide a reason for rejection.')
+      return
+    }
+    await db.loans.update(loan.id, {
+      status: 'rejected',
+      rejectionReason: rejectionReason.trim()
+    })
+    // TODO (backend phase): send email notification to all admins and member with rejection reason
     onClose()
   }
 
@@ -298,36 +310,64 @@ function LoanDetailModal({
         )}
         {loan.dueDate && <p>Due: {new Date(loan.dueDate).toLocaleDateString()}</p>}
         {loan.remarks && <p className="text-gray-400 italic">"{loan.remarks}"</p>}
+        {loan.status === 'rejected' && loan.rejectionReason && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">
+            <p className="text-red-700 text-xs font-medium">Rejection Reason:</p>
+            <p className="text-red-600 text-sm mt-0.5">{loan.rejectionReason}</p>
+          </div>
+        )}
       </div>
 
-      {/* Approve — admin sets interest + duration here */}
-      {loan.status === 'requested' && canWrite && (
+      {/* Approve section — admin sets terms */}
+      {loan.status === 'requested' && canWrite && !showRejectForm && (
         <div className="bg-glg-50 border border-glg-100 rounded-lg p-3 mb-4 space-y-3">
-          <p className="text-sm font-medium text-glg-700">Set Loan Terms</p>
+          <p className="text-sm font-medium text-glg-700">Set Loan Terms to Approve</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Interest Rate (%)</label>
-              <input
-                type="number"
-                value={interestRate}
-                onChange={(e) => setInterestRate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
+              <input type="number" value={interestRate} onChange={e => setInterestRate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Duration (months)</label>
-              <input
-                type="number"
-                value={durationMonths}
-                onChange={(e) => setDurationMonths(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
+              <input type="number" value={durationMonths} onChange={e => setDurationMonths(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={reject} className="text-sm px-4 py-2 rounded-lg text-red-600 hover:bg-red-50">Reject</button>
-            <button onClick={approve} className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+            <button onClick={() => setShowRejectForm(true)}
+              className="text-sm px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200">
+              Reject…
+            </button>
+            <button onClick={approve}
+              className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
               Approve with These Terms
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reject form — requires reason */}
+      {loan.status === 'requested' && canWrite && showRejectForm && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 space-y-3">
+          <p className="text-sm font-medium text-red-700">Provide Rejection Reason</p>
+          <p className="text-xs text-red-500">This reason will be visible to the member on their dashboard.</p>
+          <textarea
+            value={rejectionReason}
+            onChange={e => { setRejectionReason(e.target.value); setRejectError('') }}
+            placeholder="e.g. Outstanding loan balance must be cleared first…"
+            rows={3}
+            className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+          />
+          {rejectError && <p className="text-xs text-red-600">{rejectError}</p>}
+          <div className="flex justify-end gap-2">
+            <button onClick={() => { setShowRejectForm(false); setRejectError('') }}
+              className="text-sm px-4 py-2 rounded-lg text-gray-500 hover:bg-gray-100">
+              Back
+            </button>
+            <button onClick={reject}
+              className="bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+              Confirm Rejection
             </button>
           </div>
         </div>
@@ -335,7 +375,8 @@ function LoanDetailModal({
 
       {loan.status === 'approved' && canWrite && (
         <div className="flex justify-end mb-4">
-          <button onClick={disburse} className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+          <button onClick={disburse}
+            className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
             Mark as Disbursed
           </button>
         </div>
@@ -345,13 +386,10 @@ function LoanDetailModal({
         <form onSubmit={recordRepayment} className="bg-gray-50 rounded-lg p-3 mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">Record Repayment (MK)</label>
           <div className="flex gap-2">
-            <input
-              type="number"
-              value={repayAmount}
-              onChange={(e) => setRepayAmount(e.target.value)}
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
-            />
-            <button type="submit" className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+            <input type="number" value={repayAmount} onChange={e => setRepayAmount(e.target.value)}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2" />
+            <button type="submit"
+              className="bg-glg-600 hover:bg-glg-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
               Record
             </button>
           </div>
@@ -362,7 +400,7 @@ function LoanDetailModal({
         <div>
           <p className="text-sm font-medium text-gray-700 mb-2">Repayment History</p>
           <div className="space-y-1 text-xs text-gray-500 max-h-36 overflow-y-auto">
-            {repayments.map((r) => (
+            {repayments.map(r => (
               <div key={r.id} className="flex justify-between border-b border-gray-100 py-1">
                 <span>{new Date(r.paidAt).toLocaleDateString()}</span>
                 <span>MK {r.amount.toLocaleString()} · principal {r.principalPortion.toLocaleString()} · interest {r.interestPortion.toLocaleString()}</span>
